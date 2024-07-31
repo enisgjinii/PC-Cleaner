@@ -7,9 +7,6 @@ import psutil
 import threading
 import logging
 from PIL import Image, ImageTk
-import joblib
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -22,14 +19,12 @@ class PCCleanerApp(ctk.CTk):
         self.geometry("1000x600")
         
         self.resizable(False, False)
-        # self.attributes('-toolwindow', True)
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self.setup_ui()
         self.setup_logging()
-        self.setup_ai_model()
 
     def setup_ui(self):
         # Sidebar
@@ -59,6 +54,8 @@ class PCCleanerApp(ctk.CTk):
         self.quick_clean_btn.pack(pady=10)
         self.deep_clean_btn = ctk.CTkButton(self.cleaning_frame, text="Deep Clean", command=self.deep_clean)
         self.deep_clean_btn.pack(pady=10)
+        self.ai_recommend_btn = ctk.CTkButton(self.cleaning_frame, text="AI Recommendations", command=self.get_ai_recommendations)
+        self.ai_recommend_btn.pack(pady=10)
 
         # System info frame
         self.system_info_frame = ctk.CTkFrame(self.main_frame)
@@ -68,11 +65,15 @@ class PCCleanerApp(ctk.CTk):
         self.memory_label.pack(pady=5)
         self.disk_label = ctk.CTkLabel(self.system_info_frame, text="Disk Usage: ")
         self.disk_label.pack(pady=5)
+        self.health_predict_btn = ctk.CTkButton(self.system_info_frame, text="Predict System Health", command=self.predict_system_health)
+        self.health_predict_btn.pack(pady=10)
 
         # Disk analyzer frame
         self.disk_analyzer_frame = ctk.CTkFrame(self.main_frame)
         self.analyze_btn = ctk.CTkButton(self.disk_analyzer_frame, text="Analyze Disk", command=self.analyze_disk)
         self.analyze_btn.pack(pady=10)
+        self.categorize_btn = ctk.CTkButton(self.disk_analyzer_frame, text="Intelligent Categorization", command=self.intelligent_categorization)
+        self.categorize_btn.pack(pady=10)
         self.disk_tree = ttk.Treeview(self.disk_analyzer_frame, columns=('size', 'type'), show='tree headings')
         self.disk_tree.heading('size', text='Size')
         self.disk_tree.heading('type', text='Type')
@@ -88,79 +89,6 @@ class PCCleanerApp(ctk.CTk):
         self.log_text.grid(row=0, column=0, sticky="nsew")
 
         self.show_cleaning_frame()
-        # Add AI Recommendations button
-        self.ai_recommend_btn = ctk.CTkButton(self.cleaning_frame, text="AI Recommendations", command=self.get_ai_recommendations)
-        self.ai_recommend_btn.pack(pady=10)
-
-        # Add System Health Prediction
-        self.health_predict_btn = ctk.CTkButton(self.system_info_frame, text="Predict System Health", command=self.predict_system_health)
-        self.health_predict_btn.pack(pady=10)
-
-        # Add Intelligent File Categorization
-        self.categorize_btn = ctk.CTkButton(self.disk_analyzer_frame, text="Intelligent Categorization", command=self.intelligent_categorization)
-        self.categorize_btn.pack(pady=10)
-
-    def setup_ai_model(self):
-        # In a real scenario, you'd load a pre-trained model
-        # For this example, we'll create a simple model
-        self.model = RandomForestClassifier(n_estimators=10)
-        
-        # Dummy training data
-        X = np.random.rand(100, 3)  # 3 features: CPU, Memory, Disk usage
-        y = np.random.choice(['Clean', 'Optimize', 'No Action'], 100)
-        
-        self.model.fit(X, y)
-
-    def get_ai_recommendations(self):
-        cpu = psutil.cpu_percent()
-        memory = psutil.virtual_memory().percent
-        disk = psutil.disk_usage('/').percent
-        
-        features = np.array([[cpu, memory, disk]])
-        recommendation = self.model.predict(features)[0]
-        
-        self.log_message(f"AI Recommendation: {recommendation}")
-        messagebox.showinfo("AI Recommendation", f"Based on current system state, the AI recommends: {recommendation}")
-
-    def predict_system_health(self):
-        cpu = psutil.cpu_percent()
-        memory = psutil.virtual_memory().percent
-        disk = psutil.disk_usage('/').percent
-        
-        health_score = 100 - (cpu + memory + disk) / 3
-        
-        self.log_message(f"Predicted System Health: {health_score:.2f}%")
-        messagebox.showinfo("System Health Prediction", f"Your system health score is: {health_score:.2f}%")
-
-    def intelligent_categorization(self):
-        folder = filedialog.askdirectory()
-        if folder:
-            self.log_message("Starting intelligent file categorization...")
-            threading.Thread(target=self._categorize_files, args=(folder,), daemon=True).start()
-
-    def _categorize_files(self, folder):
-        categories = {
-            'Documents': ['.txt', '.doc', '.docx', '.pdf'],
-            'Images': ['.jpg', '.jpeg', '.png', '.gif'],
-            'Videos': ['.mp4', '.avi', '.mov'],
-            'Audio': ['.mp3', '.wav', '.flac'],
-            'Archives': ['.zip', '.rar', '.7z']
-        }
-
-        categorized_files = {cat: [] for cat in categories}
-        
-        for root, _, files in os.walk(folder):
-            for file in files:
-                ext = os.path.splitext(file)[1].lower()
-                for category, extensions in categories.items():
-                    if ext in extensions:
-                        categorized_files[category].append(os.path.join(root, file))
-                        break
-
-        for category, files in categorized_files.items():
-            self.log_message(f"{category}: {len(files)} files")
-
-        messagebox.showinfo("Categorization Complete", "File categorization completed. Check the log for details.")
 
     def setup_logging(self):
         self.logger = logging.getLogger('PCCleaner')
@@ -299,6 +227,61 @@ class PCCleanerApp(ctk.CTk):
         except Exception as e:
             self.log_message(f"Error analyzing folder {folder}: {str(e)}")
         return total_size
+
+    def get_ai_recommendations(self):
+        cpu = psutil.cpu_percent()
+        memory = psutil.virtual_memory().percent
+        disk = psutil.disk_usage('/').percent
+        
+        if cpu > 80 or memory > 80 or disk > 80:
+            recommendation = "Your system is under heavy load. Consider closing unnecessary applications and performing a deep clean."
+        elif cpu > 60 or memory > 60 or disk > 60:
+            recommendation = "Your system resources are being used significantly. A quick clean might help improve performance."
+        else:
+            recommendation = "Your system seems to be running smoothly. Regular maintenance is still recommended."
+        
+        self.log_message(f"AI Recommendation: {recommendation}")
+        messagebox.showinfo("AI Recommendation", recommendation)
+
+    def predict_system_health(self):
+        cpu = psutil.cpu_percent()
+        memory = psutil.virtual_memory().percent
+        disk = psutil.disk_usage('/').percent
+        
+        health_score = 100 - (cpu + memory + disk) / 3
+        
+        self.log_message(f"Predicted System Health: {health_score:.2f}%")
+        messagebox.showinfo("System Health Prediction", f"Your system health score is: {health_score:.2f}%")
+
+    def intelligent_categorization(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.log_message("Starting intelligent file categorization...")
+            threading.Thread(target=self._categorize_files, args=(folder,), daemon=True).start()
+
+    def _categorize_files(self, folder):
+        categories = {
+            'Documents': ['.txt', '.doc', '.docx', '.pdf'],
+            'Images': ['.jpg', '.jpeg', '.png', '.gif'],
+            'Videos': ['.mp4', '.avi', '.mov'],
+            'Audio': ['.mp3', '.wav', '.flac'],
+            'Archives': ['.zip', '.rar', '.7z']
+        }
+
+        categorized_files = {cat: [] for cat in categories}
+        
+        for root, _, files in os.walk(folder):
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                for category, extensions in categories.items():
+                    if ext in extensions:
+                        categorized_files[category].append(os.path.join(root, file))
+                        break
+
+        for category, files in categorized_files.items():
+            self.log_message(f"{category}: {len(files)} files")
+
+        messagebox.showinfo("Categorization Complete", "File categorization completed. Check the log for details.")
 
 if __name__ == "__main__":
     app = PCCleanerApp()
